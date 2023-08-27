@@ -13,7 +13,7 @@ class SDA_LOSS(nn.Layer):
    
 
     def sda_loss(self,source, target,s_label, t_label,r,r1):
-        m, n = source.shape
+       m, n = source.shape
         _, p = target.shape
         source /= paddle.norm(source, axis=1).unsqueeze(1)
         target /= paddle.norm(target, axis=1).unsqueeze(1)
@@ -24,17 +24,26 @@ class SDA_LOSS(nn.Layer):
         #print(sim)
         #r = paddle.unsqueeze(r, axis=0)
         #print(r)
-        r = paddle.expand(r, shape=[2*m, m])
+        x = paddle.ones(shape=[m])
+        #print(x)
+        rx =  paddle.concat([x, r], axis=0)
+        rx1 = paddle.unsqueeze(rx, axis=1)
+        rx2 = paddle.unsqueeze(rx, axis=0)
 
+        #r = paddle.expand(r, shape=[2*m, m])
+        rx3 = paddle.matmul(rx1,rx2)
+        #print(rx3)
+        sim = sim*rx3
+        #sim[:,m:2*m] = sim[:,m:2*m]*r
+        #print(sim)
+        #print(r)b
         
         #print(sim)
-        #print(r)
-        sim[:,128:256] = sim[:,128:256]*r
-        #print(sim)
+       
       
 
         
-        t_label = paddle.reshape(t_label,[128,1])
+        t_label = paddle.reshape(t_label,[m,1])
 
         label = paddle.concat([s_label, t_label], axis=0)
         label = label.squeeze()
@@ -43,19 +52,35 @@ class SDA_LOSS(nn.Layer):
         #print(label)
         #print(mask_p)
 
+        
+
         matrix = np.ones((2*m, 2*m), dtype=bool)
         # 将矩阵对角线上的元素设置为False
         np.fill_diagonal(matrix, False)
         #print(matrix)
         matrix = paddle.to_tensor(matrix)
+        #print(matrix)
 
-        nominator = paddle.exp(sim*mask_p/r1)
-        dnominator = paddle.exp(sim*mask_n*matrix/r1)
+        nominator = paddle.exp(sim/r1)
+        dnominator = paddle.exp(sim/r1)
+
+
+
+
+        nominator = nominator*mask_p
+        # print(dnominator)
+        # print(dnominator*mask_n)
+        # print(dnominator*mask_n*matrix)
+
+        dnominator =dnominator*mask_n
 
         a=paddle.mean(nominator, axis=1)
         b=paddle.sum(dnominator, axis=1)
         loss_partial = -paddle.log(a/b) 
-        loss = paddle.sum(loss_partial) / (2*m)
+
+        # loss_partial =  paddle.unsqueeze(loss_partial, axis=0)
+        # loss_partial[:,m:2*m] = loss_partial[:,m:2*m]*r
+        loss = paddle.mean(loss_partial) 
 
         return loss
 
